@@ -1,0 +1,48 @@
+import { Colors, Fonts, TypeScale, Spacing } from '@/theme/constants';
+import { View, Text, StyleSheet } from 'react-native';
+
+type Props = {
+  seatsRemaining: number;
+  capacity: number;
+};
+
+/**
+ * CapacityIndicator — shows seats remaining using royal (the only accent).
+ * IBM Plex Mono numerals with increased letter-spacing.
+ */
+export default function CapacityIndicator({ seatsRemaining, capacity }: Props) {
+  const isSoldOut = seatsRemaining === 0;
+  const isLow = seatsRemaining > 0 && seatsRemaining <= Math.ceil(capacity * 0.1);
+
+  return (
+    <View style={styles.row}>
+      <Text style={[styles.numeral, isSoldOut && styles.numeralMuted]}>
+        {isSoldOut ? '0' : seatsRemaining}
+      </Text>
+      <Text style={styles.label}>
+        {isSoldOut ? ' seats left — waitlist open' : isLow ? ' seats left' : ` of ${capacity} seats left`}
+      </Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  numeral: {
+    fontFamily: Fonts.monoMedium,
+    ...TypeScale.body,
+    color: Colors.royal,
+    letterSpacing: 0.5,
+  },
+  numeralMuted: {
+    color: Colors.muted,
+  },
+  label: {
+    fontFamily: Fonts.body,
+    ...TypeScale.caption,
+    color: Colors.muted,
+  },
+});
