@@ -18,6 +18,7 @@ import { Colors, Fonts, TypeScale, Spacing, Radius, Shadows } from '@/theme/cons
 type RegistrationState =
   | { phase: 'idle' }
   | { phase: 'loading' }
+  | { phase: 'cancelling' }
   | { phase: 'done'; result: RegisterResult; eventName: string; event: Event };
 
 export default function EventDetailScreen() {
@@ -43,9 +44,15 @@ export default function EventDetailScreen() {
         .maybeSingle(),
     ]);
     setEvent(eventData ?? null);
-    if (regData) {
+    // FIX: a 'cancelled' row used to be treated identically to an active
+    // one, so a user who cancelled could never see the Register button
+    // again. Only 'confirmed' / 'waitlisted' rows count as "registered".
+    if (regData && regData.status !== 'cancelled') {
       setAlreadyRegistered(true);
       setExistingReg({ registration_id: regData.id, status: regData.status, seats_remaining: eventData?.seats_remaining ?? 0 });
+    } else {
+      setAlreadyRegistered(false);
+      setExistingReg(null);
     }
     setLoading(false);
   }, [id, user]);
@@ -80,6 +87,51 @@ export default function EventDetailScreen() {
     setEvent(refreshed ?? event);
     setRegState({ phase: 'done', result: data as RegisterResult, eventName: event.name, event: refreshed ?? event });
     setAlreadyRegistered(true);
+  }
+
+  // ── Cancel ── (NEW: previously did not exist anywhere in the app)
+  async function handleCancel() {
+    if (!user || !event) return;
+    const registrationId =
+      regState.phase === 'done' ? regState.result.registration_id : existingReg?.registration_id;
+    if (!registrationId) return;
+
+    Alert.alert(
+      'Cancel registration?',
+      "You'll give up your spot and, if you were confirmed, someone on the waitlist may take it.",
+      [
+        { text: 'Keep my spot', style: 'cancel' },
+        {
+          text: 'Cancel registration',
+          style: 'destructive',
+          onPress: async () => {
+            setRegState({ phase: 'cancelling' });
+
+            const { data, error } = await supabase.rpc('cancel_registration', {
+              p_registration_id: registrationId,
+              p_user_id: user.id,
+            });
+
+            if (error || !data || data.error) {
+              setRegState({ phase: 'idle' });
+              Alert.alert('Cancellation failed', error?.message ?? data?.error ?? 'Please try again.');
+              return;
+            }
+
+            const { data: refreshed } = await supabase
+              .from('events')
+              .select('*')
+              .eq('id', event.id)
+              .single();
+
+            setEvent(refreshed ?? event);
+            setAlreadyRegistered(false);
+            setExistingReg(null);
+            setRegState({ phase: 'idle' });
+          },
+        },
+      ]
+    );
   }
 
   // ── Format helpers ──
@@ -122,6 +174,7 @@ export default function EventDetailScreen() {
 
   const showTicket = regState.phase === 'done' || (alreadyRegistered && existingReg);
   const ticketResult = regState.phase === 'done' ? regState.result : existingReg;
+  const isCancelling = regState.phase === 'cancelling';
 
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
@@ -174,6 +227,19 @@ export default function EventDetailScreen() {
               ? "You're registered. See you there!"
               : "You're on the waitlist. We'll notify you if a spot opens."}
           </Text>
+          <Pressable
+            style={({ pressed }) => [
+              styles.cancelButton,
+              pressed && styles.cancelButtonPressed,
+              isCancelling && styles.registerButtonLoading,
+            ]}
+            onPress={handleCancel}
+            disabled={isCancelling}
+          >
+            <Text style={styles.cancelButtonText}>
+              {isCancelling ? 'Cancelling…' : 'Cancel registration'}
+            </Text>
+          </Pressable>
         </View>
       ) : (
         <Pressable
@@ -313,5 +379,21 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.bodySemiBold,
     ...TypeScale.body,
     color: Colors.paper,
+  },
+  cancelButton: {
+    marginTop: Spacing.base,
+    paddingVertical: Spacing.base,
+    borderRadius: Radius,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.line,
+  },
+  cancelButtonPressed: {
+    backgroundColor: Colors.line,
+  },
+  cancelButtonText: {
+    fontFamily: Fonts.bodySemiBold,
+    ...TypeScale.body,
+    color: Colors.muted,
   },
 });
