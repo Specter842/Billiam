@@ -50,5 +50,16 @@ export type Registration = {
 export type RegisterResult = {
   registration_id: string;
   status: RegistrationStatus;
-  seats_remaining: number;
+  // FIX: cancel_registration() returns null here when the cancelled
+  // registration was never confirmed (nothing to give back), and
+  // register_for_event() never returns null. Both RPCs share this type,
+  // so it has to allow null or TypeScript is lying to you.
+  seats_remaining: number | null;
+};
+
+export type CancelResult = {
+  registration_id: string;
+  status: 'cancelled';
+  seats_remaining: number | null;
+  error?: string;
 };
