@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Events",
+    "name": "Billiam",
     "slug": "event-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -9,7 +9,10 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.events.app"
+      "bundleIdentifier": "com.events.app",
+      "config": {
+        "googleMapsApiKey": ""
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -39,12 +42,6 @@
           "image": "./assets/images/splash-icon.png",
           "resizeMode": "contain",
           "backgroundColor": "#FFFFFF"
-        }
-      ],
-      [
-        "react-native-maps",
-        {
-          "googleMapsApiKey": ""
         }
       ]
     ],
