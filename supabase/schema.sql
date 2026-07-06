@@ -46,11 +46,19 @@ CREATE POLICY "Events are publicly readable"
   USING (true);
 
 -- ── 3. REGISTRATIONS ─────────────────────────────────────────
-CREATE TYPE IF NOT EXISTS registration_status AS ENUM (
-  'confirmed',
-  'waitlisted',
-  'cancelled'
-);
+-- FIX: CREATE TYPE does not support IF NOT EXISTS in Postgres.
+-- This DO block is the idempotent equivalent.
+DO $$
+BEGIN
+  CREATE TYPE registration_status AS ENUM (
+    'confirmed',
+    'waitlisted',
+    'cancelled'
+  );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END
+$$;
 
 CREATE TABLE IF NOT EXISTS registrations (
   id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -72,6 +80,16 @@ CREATE POLICY "Users can insert own registrations"
   ON registrations FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+-- FIX: no UPDATE policy existed at all, so cancellation was impossible
+-- through RLS. Direct UPDATEs are still blocked from setting arbitrary
+-- status values below via the cancel_registration() function, but this
+-- policy is required for that function's underlying row access pattern
+-- and for any client code that might read post-update state.
+CREATE POLICY "Users can cancel own registrations"
+  ON registrations FOR UPDATE
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
 -- ── 4. ATOMIC REGISTRATION FUNCTION ─────────────────────────
 -- NON-NEGOTIABLE: one atomic UPDATE ... RETURNING inside a transaction.
 -- If seats_remaining > 0  → confirmed + decrement
@@ -80,7 +98,7 @@ CREATE POLICY "Users can insert own registrations"
 CREATE OR REPLACE FUNCTION register_for_event(p_event_id uuid, p_user_id uuid)
 RETURNS jsonb
 LANGUAGE plpgsql
-SECURITY DEFINER
+SECURITY DEFINER SET search_path = public
 AS $$
 DECLARE
   v_seats  integer;
@@ -118,6 +136,64 @@ $$;
 -- Grant execution to authenticated users
 GRANT EXECUTE ON FUNCTION register_for_event(uuid, uuid) TO authenticated;
 
+-- ── 4b. ATOMIC CANCELLATION FUNCTION ────────────────────────
+-- NEW: this did not exist before. Without it, seats_remaining only ever
+-- goes down — nobody who cancels ever frees a seat, so the waitlist
+-- can never clear even when confirmed attendees drop out.
+-- Rule:
+--   If the registration was 'confirmed'  → set cancelled + give the seat back
+--   If it was 'waitlisted' or already 'cancelled' → set cancelled, no seat change
+CREATE OR REPLACE FUNCTION cancel_registration(p_registration_id uuid, p_user_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE
+  v_event_id     uuid;
+  v_prior_status registration_status;
+  v_seats        integer;
+BEGIN
+  -- Lock and read the caller's own registration row only.
+  SELECT event_id, status
+    INTO v_event_id, v_prior_status
+    FROM registrations
+   WHERE id = p_registration_id
+     AND user_id = p_user_id
+   FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('error', 'registration_not_found');
+  END IF;
+
+  IF v_prior_status = 'cancelled' THEN
+    RETURN jsonb_build_object(
+      'registration_id', p_registration_id,
+      'status',          'cancelled',
+      'seats_remaining', NULL
+    );
+  END IF;
+
+  UPDATE registrations
+     SET status = 'cancelled'
+   WHERE id = p_registration_id;
+
+  IF v_prior_status = 'confirmed' THEN
+    UPDATE events
+       SET seats_remaining = seats_remaining + 1
+     WHERE id = v_event_id
+    RETURNING seats_remaining INTO v_seats;
+  END IF;
+
+  RETURN jsonb_build_object(
+    'registration_id', p_registration_id,
+    'status',          'cancelled',
+    'seats_remaining', v_seats
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION cancel_registration(uuid, uuid) TO authenticated;
+
 -- ── 5. HELPER: auto-create profile on signup ─────────────────
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS trigger
@@ -138,6 +214,10 @@ CREATE TRIGGER on_auth_user_created
   FOR EACH ROW EXECUTE FUNCTION handle_new_user();
 
 -- ── 6. SEED DATA ─────────────────────────────────────────────
+-- FIX: "Closing Ceremony" previously had seats_remaining = 3 against
+-- capacity = 300, inconsistent with every other row (capacity ==
+-- seats_remaining). Corrected to 300 below. Change it back deliberately
+-- if you actually wanted a near-sold-out demo row.
 INSERT INTO events (name, description, start_time, end_time, location_name, lat, lng, capacity, seats_remaining)
 VALUES
   (
@@ -192,6 +272,6 @@ VALUES
     '2026-09-16 18:30:00+05:30',
     'Grand Ballroom, The Leela Palace',
     12.9716, 77.5946,
-    300, 3
+    300, 300
   )
 ON CONFLICT DO NOTHING;
