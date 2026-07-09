@@ -1,5 +1,7 @@
 import { Tabs } from 'expo-router';
-import { Colors, Fonts } from '@/theme/constants';
+import { useThemeColors, Fonts } from '@/theme/constants';
+import { useAuth } from '@/lib/auth';
+import { ADMIN_EMAIL } from '@/lib/admin';
 import { Platform, Text } from 'react-native';
 
 function TabIcon({ label, focused }: { label: string; focused: boolean }) {
@@ -20,9 +22,13 @@ const ICONS: Record<string, { active: string; inactive: string }> = {
   calendar:      { active: '▣', inactive: '□' },
   accommodation: { active: '⬛', inactive: '⬜' },
   contact:       { active: '◆', inactive: '◇' },
+  admin:         { active: '⚙', inactive: '⚙' },
 };
 
 export default function TabsLayout() {
+  const Colors = useThemeColors();
+  const { profile } = useAuth();
+  const isAdmin = profile?.email === ADMIN_EMAIL;
   return (
     <Tabs
       screenOptions={({ route }) => ({
@@ -83,6 +89,17 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="contact"
         options={{ title: 'Contact', tabBarLabel: 'Contact' }}
+      />
+      <Tabs.Screen
+        name="admin"
+        options={{
+          title: 'Admin',
+          tabBarLabel: 'Admin',
+          // Hidden from the tab bar (and unreachable via it) for everyone
+          // except the admin email — enforced for real by RLS server-side,
+          // this is just UX so non-admins don't see a dead-end tab.
+          href: isAdmin ? undefined : null,
+        }}
       />
     </Tabs>
   );

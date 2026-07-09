@@ -13,14 +13,20 @@ CREATE TABLE IF NOT EXISTS profiles (
 
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 
+-- FIX: CREATE POLICY has no IF NOT EXISTS, so re-running this file against
+-- a project that already ran it once errored with "policy already exists".
+-- Drop-then-create makes every policy in this file safe to re-run.
+DROP POLICY IF EXISTS "Users can view own profile" ON profiles;
 CREATE POLICY "Users can view own profile"
   ON profiles FOR SELECT
   USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
 CREATE POLICY "Users can update own profile"
   ON profiles FOR UPDATE
   USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Users can insert own profile" ON profiles;
 CREATE POLICY "Users can insert own profile"
   ON profiles FOR INSERT
   WITH CHECK (auth.uid() = id);
@@ -41,9 +47,31 @@ CREATE TABLE IF NOT EXISTS events (
 
 ALTER TABLE events ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Events are publicly readable" ON events;
 CREATE POLICY "Events are publicly readable"
   ON events FOR SELECT
   USING (true);
+
+-- Admin panel access: hardcoded to one email for now (per current
+-- product decision — revisit with a real roles table if more admins are
+-- ever needed). This is the actual enforcement; the client only hides
+-- the Admin tab for non-admins as UX, so these policies are what
+-- actually stop a non-admin from writing to `events` via the API directly.
+DROP POLICY IF EXISTS "Admin can insert events" ON events;
+CREATE POLICY "Admin can insert events"
+  ON events FOR INSERT
+  WITH CHECK (auth.jwt() ->> 'email' = 'user@example.com');
+
+DROP POLICY IF EXISTS "Admin can update events" ON events;
+CREATE POLICY "Admin can update events"
+  ON events FOR UPDATE
+  USING (auth.jwt() ->> 'email' = 'user@example.com')
+  WITH CHECK (auth.jwt() ->> 'email' = 'user@example.com');
+
+DROP POLICY IF EXISTS "Admin can delete events" ON events;
+CREATE POLICY "Admin can delete events"
+  ON events FOR DELETE
+  USING (auth.jwt() ->> 'email' = 'user@example.com');
 
 -- ── 3. REGISTRATIONS ─────────────────────────────────────────
 -- FIX: CREATE TYPE does not support IF NOT EXISTS in Postgres.
@@ -72,10 +100,12 @@ CREATE TABLE IF NOT EXISTS registrations (
 
 ALTER TABLE registrations ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view own registrations" ON registrations;
 CREATE POLICY "Users can view own registrations"
   ON registrations FOR SELECT
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert own registrations" ON registrations;
 CREATE POLICY "Users can insert own registrations"
   ON registrations FOR INSERT
   WITH CHECK (auth.uid() = user_id);
@@ -85,6 +115,7 @@ CREATE POLICY "Users can insert own registrations"
 -- status values below via the cancel_registration() function, but this
 -- policy is required for that function's underlying row access pattern
 -- and for any client code that might read post-update state.
+DROP POLICY IF EXISTS "Users can cancel own registrations" ON registrations;
 CREATE POLICY "Users can cancel own registrations"
   ON registrations FOR UPDATE
   USING (auth.uid() = user_id)
@@ -201,8 +232,19 @@ LANGUAGE plpgsql
 SECURITY DEFINER SET search_path = public
 AS $$
 BEGIN
-  INSERT INTO profiles (id, email)
-  VALUES (NEW.id, NEW.email)
+  -- name/phone come from signUp()'s `options.data` (auth.users.raw_user_meta_data).
+  -- FIX: the client used to upsert these itself right after signUp(), which
+  -- fails RLS whenever email confirmation is on — signUp() returns a user
+  -- but no session until the link is clicked, so auth.uid() is null for
+  -- that request. Doing it here (SECURITY DEFINER, same transaction as the
+  -- auth.users insert) sidesteps RLS entirely.
+  INSERT INTO profiles (id, email, name, phone)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    NEW.raw_user_meta_data->>'name',
+    NEW.raw_user_meta_data->>'phone'
+  )
   ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
 END;

@@ -15,7 +15,7 @@ type AuthContextType = {
     password: string,
     name: string,
     phone: string
-  ) => Promise<{ error: string | null }>;
+  ) => Promise<{ error: string | null; confirmedImmediately?: boolean }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 };
@@ -51,11 +51,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // ── Fetch profile row ──
   async function fetchProfile(userId: string) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
       .single();
+    if (error) {
+      console.error('fetchProfile failed:', error.message);
+    }
     setProfile(data ?? null);
     setLoading(false);
   }
@@ -69,15 +72,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // ── Sign up ──
   async function signUp(email: string, password: string, name: string, phone: string) {
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    // name/phone ride along as user metadata; the on_auth_user_created
+    // trigger (SECURITY DEFINER) writes the profiles row from them. Doing
+    // it there instead of a client-side upsert avoids an RLS failure when
+    // email confirmation is enabled: signUp() returns before a session
+    // exists, so auth.uid() is null for any request we'd send here.
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { name, phone } },
+    });
     if (error) return { error: error.message };
-    if (data.user) {
-      // Upsert profile with name + phone (trigger creates the row; we fill extra fields)
-      await supabase
-        .from('profiles')
-        .upsert({ id: data.user.id, email, name, phone });
-    }
-    return { error: null };
+    // If email confirmation is off, signUp() already returns a live
+    // session — the auth listener above picks it up. Callers use this to
+    // skip the "check your email" screen and go straight into the app.
+    return { error: null, confirmedImmediately: data.session !== null };
   }
 
   // ── Sign out ──

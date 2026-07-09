@@ -1,4 +1,4 @@
-import { Colors, Fonts, TypeScale, Spacing, Radius, Shadows } from '@/theme/constants';
+import { useThemeColors, Fonts, TypeScale, Spacing, Radius, Shadows, ThemeColors } from '@/theme/constants';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Event } from '@/lib/supabase';
 import CapacityIndicator from './CapacityIndicator';
@@ -13,6 +13,8 @@ type Props = {
  * royal appears ONLY on the CapacityIndicator numeral and the subtle right arrow.
  */
 export default function EventCard({ event, onPress }: Props) {
+  const Colors = useThemeColors();
+  const styles = getStyles(Colors);
   const start = new Date(event.start_time);
   const dateStr = start.toLocaleDateString('en-IN', {
     weekday: 'short',
@@ -67,7 +69,7 @@ export default function EventCard({ event, onPress }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (Colors: ThemeColors) => StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'flex-start',

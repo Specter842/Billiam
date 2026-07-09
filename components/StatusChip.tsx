@@ -1,4 +1,4 @@
-import { Colors, Fonts, TypeScale, Spacing, Radius } from '@/theme/constants';
+import { useThemeColors, Fonts, TypeScale, Spacing, Radius, ThemeColors } from '@/theme/constants';
 import { View, Text, StyleSheet } from 'react-native';
 
 type Props = {
@@ -11,6 +11,8 @@ type Props = {
  * WAITLISTED: royal-tint fill, royal text.
  */
 export default function StatusChip({ status }: Props) {
+  const Colors = useThemeColors();
+  const styles = getStyles(Colors);
   const isConfirmed = status === 'confirmed';
   return (
     <View style={[styles.chip, isConfirmed ? styles.chipConfirmed : styles.chipWaitlisted]}>
@@ -21,7 +23,7 @@ export default function StatusChip({ status }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (Colors: ThemeColors) => StyleSheet.create({
   chip: {
     alignSelf: 'flex-start',
     paddingHorizontal: Spacing.base,

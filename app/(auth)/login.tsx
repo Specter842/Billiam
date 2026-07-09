@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   View,
   Text,
+  Image,
   TextInput,
   Pressable,
   StyleSheet,
@@ -12,9 +13,11 @@ import {
 } from 'react-native';
 import { Link, router } from 'expo-router';
 import { useAuth } from '@/lib/auth';
-import { Colors, Fonts, TypeScale, Spacing, Radius } from '@/theme/constants';
+import { useThemeColors, Fonts, TypeScale, Spacing, Radius, ThemeColors } from '@/theme/constants';
 
 export default function LoginScreen() {
+  const Colors = useThemeColors();
+  const styles = getStyles(Colors);
   const { signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -46,93 +49,114 @@ export default function LoginScreen() {
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Wordmark */}
-        <View style={styles.header}>
-          <Text style={styles.wordmark}>Events</Text>
-          <Text style={styles.tagline}>Sign in to your account</Text>
-        </View>
-
-        {/* Form */}
-        <View style={styles.form}>
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-          <View style={styles.field}>
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              id="login-email"
-              style={styles.input}
-              value={email}
-              onChangeText={setEmail}
-              placeholder="you@example.com"
-              placeholderTextColor={Colors.muted}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoComplete="email"
-              autoCorrect={false}
+        <View style={styles.card}>
+          {/* Wordmark */}
+          <View style={styles.header}>
+            <Image
+              source={require('@/assets/images/logo-mark.png')}
+              style={styles.logo}
+              resizeMode="contain"
             />
+            <Text style={styles.wordmark}>FROSH</Text>
+            <Text style={styles.tagline}>Sign in to your account</Text>
           </View>
 
-          <View style={styles.field}>
-            <Text style={styles.label}>Password</Text>
-            <TextInput
-              id="login-password"
-              style={styles.input}
-              value={password}
-              onChangeText={setPassword}
-              placeholder="••••••••"
-              placeholderTextColor={Colors.muted}
-              secureTextEntry
-              autoComplete="current-password"
-            />
-          </View>
+          {/* Form */}
+          <View style={styles.form}>
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-          <Pressable
-            id="login-button"
-            style={({ pressed }) => [styles.primaryButton, pressed && styles.primaryButtonPressed]}
-            onPress={handleLogin}
-            disabled={loading}
-          >
-            <Text style={styles.primaryButtonText}>
-              {loading ? 'Signing in…' : 'Sign In'}
-            </Text>
-          </Pressable>
-        </View>
+            <View style={styles.field}>
+              <Text style={styles.label}>Email</Text>
+              <TextInput
+                id="login-email"
+                style={styles.input}
+                value={email}
+                onChangeText={setEmail}
+                placeholder="you@example.com"
+                placeholderTextColor={Colors.muted}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoComplete="email"
+                autoCorrect={false}
+              />
+            </View>
 
-        {/* Footer */}
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Don't have an account? </Text>
-          <Link href="/(auth)/signup" asChild>
-            <Pressable>
-              <Text style={styles.link}>Create one</Text>
+            <View style={styles.field}>
+              <Text style={styles.label}>Password</Text>
+              <TextInput
+                id="login-password"
+                style={styles.input}
+                value={password}
+                onChangeText={setPassword}
+                placeholder="••••••••"
+                placeholderTextColor={Colors.muted}
+                secureTextEntry
+                autoComplete="current-password"
+              />
+            </View>
+
+            <Pressable
+              id="login-button"
+              style={({ pressed }) => [styles.primaryButton, pressed && styles.primaryButtonPressed]}
+              onPress={handleLogin}
+              disabled={loading}
+            >
+              <Text style={styles.primaryButtonText}>
+                {loading ? 'Signing in…' : 'Sign In'}
+              </Text>
             </Pressable>
-          </Link>
+          </View>
+
+          {/* Footer */}
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>Don't have an account? </Text>
+            <Link href="/(auth)/signup" asChild>
+              <Pressable>
+                <Text style={styles.link}>Create one</Text>
+              </Pressable>
+            </Link>
+          </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (Colors: ThemeColors) => StyleSheet.create({
   flex: { flex: 1, backgroundColor: Colors.paper },
   container: {
     flexGrow: 1,
     padding: Spacing.lg,
     justifyContent: 'center',
+    alignItems: 'center',
+  },
+  card: {
+    width: '100%',
+    maxWidth: 420,
+    alignSelf: 'center',
   },
   header: {
+    alignItems: 'center',
     marginBottom: Spacing.xxl,
+  },
+  logo: {
+    width: 64,
+    height: 64,
+    marginBottom: Spacing.base,
   },
   wordmark: {
     fontFamily: Fonts.displayBold,
     fontSize: 36,
     lineHeight: 44,
     color: Colors.ink,
+    textAlign: 'center',
   },
   tagline: {
     fontFamily: Fonts.body,
     ...TypeScale.body,
     color: Colors.muted,
     marginTop: Spacing.xs,
+    textAlign: 'center',
   },
   form: {
     gap: Spacing.base,

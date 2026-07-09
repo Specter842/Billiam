@@ -13,7 +13,7 @@ import { supabase, Event, RegisterResult } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 import CapacityIndicator from '@/components/CapacityIndicator';
 import TicketCard from '@/components/TicketCard';
-import { Colors, Fonts, TypeScale, Spacing, Radius, Shadows } from '@/theme/constants';
+import { useThemeColors, Fonts, TypeScale, Spacing, Radius, Shadows, ThemeColors } from '@/theme/constants';
 
 type RegistrationState =
   | { phase: 'idle' }
@@ -22,6 +22,8 @@ type RegistrationState =
   | { phase: 'done'; result: RegisterResult; eventName: string; event: Event };
 
 export default function EventDetailScreen() {
+  const Colors = useThemeColors();
+  const styles = getStyles(Colors);
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
 
@@ -214,6 +216,7 @@ export default function EventDetailScreen() {
       {showTicket && ticketResult ? (
         <View>
           <Text style={styles.sectionLabel}>Your registration</Text>
+          <Text style={styles.ticketHint}>Tap the ticket to flip it and reveal your check-in QR code</Text>
           <TicketCard
             eventName={event.name}
             locationName={event.location_name}
@@ -268,6 +271,8 @@ export default function EventDetailScreen() {
 // ── Meta row helper ──────────────────────────────────────────
 
 function MetaRow({ icon, label, mono }: { icon: string; label: string; mono?: boolean }) {
+  const Colors = useThemeColors();
+  const metaStyles = getMetaStyles(Colors);
   return (
     <View style={metaStyles.row}>
       <Text style={metaStyles.icon}>{icon}</Text>
@@ -276,7 +281,7 @@ function MetaRow({ icon, label, mono }: { icon: string; label: string; mono?: bo
   );
 }
 
-const metaStyles = StyleSheet.create({
+const getMetaStyles = (Colors: ThemeColors) => StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -297,7 +302,7 @@ const metaStyles = StyleSheet.create({
 
 // ── Screen styles ─────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+const getStyles = (Colors: ThemeColors) => StyleSheet.create({
   scroll: { flex: 1, backgroundColor: Colors.paper },
   content: { padding: Spacing.base, paddingBottom: Spacing.xxl },
   center: {
@@ -354,6 +359,12 @@ const styles = StyleSheet.create({
     ...TypeScale.caption,
     color: Colors.muted,
     letterSpacing: 0.5,
+    marginBottom: Spacing.sm,
+  },
+  ticketHint: {
+    fontFamily: Fonts.body,
+    ...TypeScale.caption,
+    color: Colors.muted,
     marginBottom: Spacing.sm,
   },
   alreadyNote: {

@@ -12,9 +12,11 @@ import { router } from 'expo-router';
 import { supabase, Event } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 import EventCard from '@/components/EventCard';
-import { Colors, Fonts, TypeScale, Spacing, Radius } from '@/theme/constants';
+import { useThemeColors, Fonts, TypeScale, Spacing, Radius, ThemeColors } from '@/theme/constants';
 
 export default function EventListScreen() {
+  const Colors = useThemeColors();
+  const styles = getStyles(Colors);
   const { signOut, profile } = useAuth();
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
@@ -100,7 +102,7 @@ export default function EventListScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (Colors: ThemeColors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.paper },
   greeting: {
     flexDirection: 'row',

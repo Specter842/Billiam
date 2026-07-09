@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { supabase, Event } from '@/lib/supabase';
-import { Colors, Fonts, TypeScale, Spacing, Radius } from '@/theme/constants';
+import { useThemeColors, Fonts, TypeScale, Spacing, Radius, ThemeColors } from '@/theme/constants';
 
 type DayGroup = {
   dateKey: string;        // 'YYYY-MM-DD'
@@ -38,6 +38,8 @@ function groupByDay(events: Event[]): DayGroup[] {
 }
 
 export default function CalendarScreen() {
+  const Colors = useThemeColors();
+  const styles = getStyles(Colors);
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -154,7 +156,7 @@ function formatTime(d: Date) {
   return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
 }
 
-const styles = StyleSheet.create({
+const getStyles = (Colors: ThemeColors) => StyleSheet.create({
   scroll: { flex: 1, backgroundColor: Colors.paper },
   content: { paddingBottom: Spacing.xxl },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.paper },

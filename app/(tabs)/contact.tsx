@@ -12,12 +12,14 @@ import {
   Alert,
 } from 'react-native';
 import { useAuth } from '@/lib/auth';
-import { Colors, Fonts, TypeScale, Spacing, Radius, Shadows } from '@/theme/constants';
+import { useThemeColors, Fonts, TypeScale, Spacing, Radius, Shadows, ThemeColors } from '@/theme/constants';
 
 const CONTACT_EMAIL = 'hello@events.example.com';
 const CONTACT_PHONE = '+91 98765 43210';
 
 export default function ContactScreen() {
+  const Colors = useThemeColors();
+  const styles = getStyles(Colors);
   const { profile } = useAuth();
   const [name, setName] = useState(profile?.name ?? '');
   const [email, setEmail] = useState(profile?.email ?? '');
@@ -186,7 +188,7 @@ export default function ContactScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (Colors: ThemeColors) => StyleSheet.create({
   flex: { flex: 1, backgroundColor: Colors.paper },
   scroll: { flex: 1 },
   content: {

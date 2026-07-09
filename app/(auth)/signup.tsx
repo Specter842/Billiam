@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   View,
   Text,
+  Image,
   TextInput,
   Pressable,
   StyleSheet,
@@ -11,9 +12,11 @@ import {
 } from 'react-native';
 import { Link, router } from 'expo-router';
 import { useAuth } from '@/lib/auth';
-import { Colors, Fonts, TypeScale, Spacing, Radius } from '@/theme/constants';
+import { useThemeColors, Fonts, TypeScale, Spacing, Radius, ThemeColors } from '@/theme/constants';
 
 export default function SignupScreen() {
+  const Colors = useThemeColors();
+  const styles = getStyles(Colors);
   const { signUp } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -34,10 +37,19 @@ export default function SignupScreen() {
     }
     setLoading(true);
     setError(null);
-    const { error: authError } = await signUp(email.trim(), password, name.trim(), phone.trim());
+    const { error: authError, confirmedImmediately } = await signUp(
+      email.trim(),
+      password,
+      name.trim(),
+      phone.trim()
+    );
     setLoading(false);
     if (authError) {
       setError(authError);
+    } else if (confirmedImmediately) {
+      // Email confirmation is off on this project — signUp() already
+      // returned a live session, so there's no email to go check.
+      router.replace('/(tabs)');
     } else {
       setDone(true);
     }
@@ -46,20 +58,27 @@ export default function SignupScreen() {
   if (done) {
     return (
       <View style={styles.confirmedContainer}>
-        <Text style={styles.confirmedTitle}>Check your email</Text>
-        <Text style={styles.confirmedBody}>
-          We sent a confirmation link to{' '}
-          <Text style={styles.confirmedEmail}>{email}</Text>.
-          {'\n\n'}Open it, then sign in below.
-        </Text>
-        <Link href="/(auth)/login" asChild>
-          <Pressable
-            id="goto-login-button"
-            style={({ pressed }) => [styles.primaryButton, pressed && styles.primaryButtonPressed]}
-          >
-            <Text style={styles.primaryButtonText}>Go to Sign In</Text>
-          </Pressable>
-        </Link>
+        <View style={styles.confirmedCard}>
+          <Image
+            source={require('@/assets/images/logo-mark.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+          <Text style={styles.confirmedTitle}>Check your email</Text>
+          <Text style={styles.confirmedBody}>
+            We sent a confirmation link to{' '}
+            <Text style={styles.confirmedEmail}>{email}</Text>.
+            {'\n\n'}Open it, then sign in below.
+          </Text>
+          <Link href="/(auth)/login" asChild>
+            <Pressable
+              id="goto-login-button"
+              style={({ pressed }) => [styles.primaryButton, pressed && styles.primaryButtonPressed]}
+            >
+              <Text style={styles.primaryButtonText}>Go to Sign In</Text>
+            </Pressable>
+          </Link>
+        </View>
       </View>
     );
   }
@@ -73,8 +92,14 @@ export default function SignupScreen() {
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
       >
+      <View style={styles.card}>
         <View style={styles.header}>
-          <Text style={styles.wordmark}>Events</Text>
+          <Image
+            source={require('@/assets/images/logo-mark.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+          <Text style={styles.wordmark}>FROSH</Text>
           <Text style={styles.tagline}>Create your account</Text>
         </View>
 
@@ -159,32 +184,47 @@ export default function SignupScreen() {
             </Pressable>
           </Link>
         </View>
+      </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (Colors: ThemeColors) => StyleSheet.create({
   flex: { flex: 1, backgroundColor: Colors.paper },
   container: {
     flexGrow: 1,
     padding: Spacing.lg,
     justifyContent: 'center',
+    alignItems: 'center',
+  },
+  card: {
+    width: '100%',
+    maxWidth: 420,
+    alignSelf: 'center',
   },
   header: {
+    alignItems: 'center',
     marginBottom: Spacing.xxl,
+  },
+  logo: {
+    width: 64,
+    height: 64,
+    marginBottom: Spacing.base,
   },
   wordmark: {
     fontFamily: Fonts.displayBold,
     fontSize: 36,
     lineHeight: 44,
     color: Colors.ink,
+    textAlign: 'center',
   },
   tagline: {
     fontFamily: Fonts.body,
     ...TypeScale.body,
     color: Colors.muted,
     marginTop: Spacing.xs,
+    textAlign: 'center',
   },
   form: {
     gap: Spacing.base,
@@ -251,18 +291,28 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: Spacing.lg,
     justifyContent: 'center',
+    alignItems: 'center',
     backgroundColor: Colors.paper,
-    gap: Spacing.lg,
+  },
+  confirmedCard: {
+    width: '100%',
+    maxWidth: 420,
+    alignItems: 'center',
   },
   confirmedTitle: {
     fontFamily: Fonts.displayBold,
     ...TypeScale.display,
     color: Colors.ink,
+    textAlign: 'center',
+    marginTop: Spacing.base,
   },
   confirmedBody: {
     fontFamily: Fonts.body,
     ...TypeScale.body,
     color: Colors.muted,
+    textAlign: 'center',
+    marginTop: Spacing.lg,
+    marginBottom: Spacing.lg,
   },
   confirmedEmail: {
     fontFamily: Fonts.bodySemiBold,

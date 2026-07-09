@@ -1,5 +1,5 @@
 import { ScrollView, View, Text, StyleSheet, Linking, Pressable } from 'react-native';
-import { Colors, Fonts, TypeScale, Spacing, Radius, Shadows } from '@/theme/constants';
+import { useThemeColors, Fonts, TypeScale, Spacing, Radius, Shadows, ThemeColors } from '@/theme/constants';
 
 // ── Static accommodation data ─────────────────────────────────
 // Per spec: "do not invent additional tables" — using static content.
@@ -64,6 +64,8 @@ const HOTELS: Hotel[] = [
 ];
 
 export default function AccommodationScreen() {
+  const Colors = useThemeColors();
+  const styles = getStyles(Colors);
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
       {/* Header */}
@@ -124,7 +126,7 @@ export default function AccommodationScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (Colors: ThemeColors) => StyleSheet.create({
   scroll: { flex: 1, backgroundColor: Colors.paper },
   content: { padding: Spacing.base, paddingBottom: Spacing.xxl, gap: Spacing.base },
   intro: {

@@ -1,5 +1,14 @@
-import { Colors, Fonts, TypeScale, Spacing, Radius, Shadows } from '@/theme/constants';
-import { View, Text, StyleSheet } from 'react-native';
+import { useState } from 'react';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+  interpolate,
+  Extrapolation,
+} from 'react-native-reanimated';
+import QRCode from 'react-native-qrcode-svg';
+import { useThemeColors, Fonts, TypeScale, Spacing, Radius, Shadows, ThemeColors } from '@/theme/constants';
 import StatusChip from './StatusChip';
 
 type Props = {
@@ -11,10 +20,16 @@ type Props = {
   registrationId: string;
 };
 
+const FLIP_DURATION = 450;
+const CARD_HEIGHT = 240;
+
 /**
  * TicketCard — the signature element of the app.
  *
- * Layout:
+ * Tap anywhere on the card to flip it over (3D rotateY) and reveal a QR
+ * code on the back, encoding the registration id for check-in scanning.
+ *
+ * Layout (front):
  *   ┌─────────────────────────────┐
  *   │  Event name (Space Grotesk) │  ← top half
  *   │  Date · Time (IBM Plex Mono)│
@@ -24,6 +39,11 @@ type Props = {
  *   └─────────────────────────────┘
  */
 export default function TicketCard({ eventName, locationName, startTime, endTime, status, registrationId }: Props) {
+  const Colors = useThemeColors();
+  const styles = getStyles(Colors);
+  const [flipped, setFlipped] = useState(false);
+  const rotation = useSharedValue(0);
+
   const start = new Date(startTime);
   const end = new Date(endTime);
 
@@ -36,38 +56,65 @@ export default function TicketCard({ eventName, locationName, startTime, endTime
   const timeStr = `${formatTime(start)} – ${formatTime(end)}`;
   const shortCode = registrationId.split('-')[0].toUpperCase();
 
+  function handleFlip() {
+    const next = !flipped;
+    setFlipped(next);
+    rotation.value = withTiming(next ? 180 : 0, { duration: FLIP_DURATION });
+  }
+
+  const frontStyle = useAnimatedStyle(() => ({
+    transform: [{ perspective: 1200 }, { rotateY: `${rotation.value}deg` }],
+    opacity: interpolate(rotation.value, [0, 90, 91], [1, 1, 0], Extrapolation.CLAMP),
+  }));
+  const backStyle = useAnimatedStyle(() => ({
+    transform: [{ perspective: 1200 }, { rotateY: `${rotation.value - 180}deg` }],
+    opacity: interpolate(rotation.value, [89, 90, 180], [0, 1, 1], Extrapolation.CLAMP),
+  }));
+
   return (
-    <View style={[styles.card, Shadows.card]}>
-      {/* Top half — event details */}
-      <View style={styles.topHalf}>
-        <Text style={styles.eventName} numberOfLines={2}>
-          {eventName}
-        </Text>
-        {locationName ? (
-          <Text style={styles.location} numberOfLines={1}>
-            {locationName}
+    <Pressable
+      onPress={handleFlip}
+      accessibilityRole="button"
+      accessibilityLabel={flipped ? 'Ticket back. Tap to show ticket details.' : 'Ticket front. Tap to show QR code.'}
+      style={styles.flipContainer}
+    >
+      {/* Front face */}
+      <Animated.View style={[styles.face, Shadows.card, frontStyle]}>
+        <View style={styles.topHalf}>
+          <Text style={styles.eventName} numberOfLines={2}>
+            {eventName}
           </Text>
-        ) : null}
-        <Text style={styles.datetime}>{dateStr}</Text>
-        <Text style={styles.datetime}>{timeStr}</Text>
-      </View>
-
-      {/* Perforation line */}
-      <View style={styles.perforationRow}>
-        <View style={styles.perfNotchLeft} />
-        <View style={styles.perforationLine} />
-        <View style={styles.perfNotchRight} />
-      </View>
-
-      {/* Bottom half — status + code */}
-      <View style={styles.bottomHalf}>
-        <StatusChip status={status} />
-        <View style={styles.codeBlock}>
-          <Text style={styles.codeLabel}>REF</Text>
-          <Text style={styles.code}>{shortCode}</Text>
+          {locationName ? (
+            <Text style={styles.location} numberOfLines={1}>
+              {locationName}
+            </Text>
+          ) : null}
+          <Text style={styles.datetime}>{dateStr}</Text>
+          <Text style={styles.datetime}>{timeStr}</Text>
         </View>
-      </View>
-    </View>
+
+        <View style={styles.perforationRow}>
+          <View style={styles.perfNotchLeft} />
+          <View style={styles.perforationLine} />
+          <View style={styles.perfNotchRight} />
+        </View>
+
+        <View style={styles.bottomHalf}>
+          <StatusChip status={status} />
+          <View style={styles.codeBlock}>
+            <Text style={styles.codeLabel}>REF</Text>
+            <Text style={styles.code}>{shortCode}</Text>
+          </View>
+        </View>
+      </Animated.View>
+
+      {/* Back face — QR code */}
+      <Animated.View style={[styles.face, styles.back, Shadows.card, backStyle]}>
+        <QRCode value={registrationId} size={128} color={Colors.ink} backgroundColor={Colors.paper} />
+        <Text style={styles.backLabel}>SCAN TO CHECK IN</Text>
+        <Text style={styles.backCode}>{shortCode}</Text>
+      </Animated.View>
+    </Pressable>
   );
 }
 
@@ -75,14 +122,41 @@ function formatTime(d: Date) {
   return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
 }
 
-const styles = StyleSheet.create({
-  card: {
+const getStyles = (Colors: ThemeColors) => StyleSheet.create({
+  flipContainer: {
+    height: CARD_HEIGHT,
+    marginVertical: Spacing.base,
+  },
+  face: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: Colors.paper,
     borderWidth: 1,
     borderColor: Colors.line,
     borderRadius: 2,
     overflow: 'hidden',
-    marginVertical: Spacing.base,
+    backfaceVisibility: 'hidden',
+  },
+  back: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+  },
+  backLabel: {
+    fontFamily: Fonts.bodySemiBold,
+    ...TypeScale.caption,
+    color: Colors.muted,
+    letterSpacing: 1.5,
+    marginTop: Spacing.sm,
+  },
+  backCode: {
+    fontFamily: Fonts.mono,
+    fontSize: 16,
+    color: Colors.ink,
+    letterSpacing: 2,
   },
   topHalf: {
     padding: Spacing.lg,
