@@ -66,6 +66,17 @@ function RootContent() {
             headerTintColor: Colors.royal,
           }}
         />
+        <Stack.Screen
+          name="workshops"
+          options={{
+            headerShown: true,
+            headerTitle: '',
+            headerBackTitle: 'Events',
+            headerStyle: { backgroundColor: Colors.paper },
+            headerShadowVisible: false,
+            headerTintColor: Colors.royal,
+          }}
+        />
       </Stack>
     </View>
   );

@@ -52,6 +52,7 @@ export type Event = {
   lng: number | null;
   capacity: number;
   seats_remaining: number;
+  category: string | null;
 };
 
 export type RegistrationStatus = 'confirmed' | 'waitlisted' | 'cancelled';

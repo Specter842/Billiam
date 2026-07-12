@@ -43,6 +43,11 @@ export default function EventListScreen() {
     fetchEvents();
   }, [fetchEvents]);
 
+  // Workshops get their own page (there are 8 of them) instead of
+  // cluttering the main list — see app/workshops.tsx.
+  const mainEvents = events.filter((e) => e.category !== 'workshop');
+  const workshopCount = events.length - mainEvents.length;
+
   // ── Empty state ──
   if (!loading && events.length === 0 && !error) {
     return (
@@ -80,8 +85,25 @@ export default function EventListScreen() {
         </View>
       ) : (
         <FlatList
-          data={events}
+          data={mainEvents}
           keyExtractor={(item) => item.id}
+          ListHeaderComponent={
+            workshopCount > 0 ? (
+              <Pressable
+                id="workshops-banner"
+                style={({ pressed }) => [styles.workshopsBanner, pressed && styles.workshopsBannerPressed]}
+                onPress={() => router.push('/workshops')}
+              >
+                <View style={styles.workshopsBannerText}>
+                  <Text style={styles.workshopsBannerTitle}>Workshops</Text>
+                  <Text style={styles.workshopsBannerSubtitle}>
+                    {workshopCount} track{workshopCount !== 1 ? 's' : ''} — singing, dance, acting & more
+                  </Text>
+                </View>
+                <Text style={styles.chevron}>›</Text>
+              </Pressable>
+            ) : null
+          }
           renderItem={({ item }) => (
             <EventCard
               event={item}
@@ -125,6 +147,36 @@ const getStyles = (Colors: ThemeColors) => StyleSheet.create({
   },
   loader: { flex: 1 },
   list: { paddingBottom: Spacing.xl },
+  workshopsBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.royalTint,
+    marginHorizontal: Spacing.base,
+    marginTop: Spacing.base,
+    padding: Spacing.base,
+    borderRadius: Radius,
+    gap: Spacing.base,
+  },
+  workshopsBannerPressed: {
+    backgroundColor: Colors.royal,
+  },
+  workshopsBannerText: { flex: 1, gap: 2 },
+  workshopsBannerTitle: {
+    fontFamily: Fonts.displayBold,
+    ...TypeScale.h2,
+    color: Colors.royal,
+  },
+  workshopsBannerSubtitle: {
+    fontFamily: Fonts.body,
+    ...TypeScale.caption,
+    color: Colors.ink,
+  },
+  chevron: {
+    fontFamily: Fonts.body,
+    fontSize: 20,
+    color: Colors.royal,
+  },
   empty: {
     flex: 1,
     padding: Spacing.xl,

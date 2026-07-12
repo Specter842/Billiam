@@ -1,16 +1,21 @@
 import { Tabs } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors, Fonts } from '@/theme/constants';
 import { useAuth } from '@/lib/auth';
 import { ADMIN_EMAIL } from '@/lib/admin';
-import { Platform, Text } from 'react-native';
+import { Platform } from 'react-native';
 
-const ICONS: Record<string, { active: string; inactive: string }> = {
-  index:     { active: '◉', inactive: '○' },
-  locations: { active: '◈', inactive: '◇' },
-  calendar:  { active: '▣', inactive: '□' },
-  hostels:   { active: '⬛', inactive: '⬜' },
-  contact:   { active: '◆', inactive: '◇' },
-  admin:     { active: '⚙', inactive: '⚙' },
+// Unicode symbol glyphs (◉ ◈ ⬛ etc) render wildly inconsistently across
+// devices/fonts — some render as tofu, others as the wrong shape entirely.
+// Ionicons is a real vector icon font bundled with Expo, so it renders
+// identically everywhere.
+const ICONS: Record<string, { active: keyof typeof Ionicons.glyphMap; inactive: keyof typeof Ionicons.glyphMap }> = {
+  index:     { active: 'ticket', inactive: 'ticket-outline' },
+  locations: { active: 'location', inactive: 'location-outline' },
+  calendar:  { active: 'calendar', inactive: 'calendar-outline' },
+  hostels:   { active: 'home', inactive: 'home-outline' },
+  contact:   { active: 'call', inactive: 'call-outline' },
+  admin:     { active: 'settings', inactive: 'settings-outline' },
 };
 
 export default function TabsLayout() {
@@ -50,11 +55,8 @@ export default function TabsLayout() {
         headerTintColor: Colors.royal,
         tabBarIcon: ({ focused, color }) => {
           const icon = ICONS[route.name];
-          return (
-            <Text style={{ fontSize: 16, color }}>
-              {focused ? icon?.active ?? '●' : icon?.inactive ?? '○'}
-            </Text>
-          );
+          const name = icon ? (focused ? icon.active : icon.inactive) : 'ellipse-outline';
+          return <Ionicons name={name} size={22} color={color} />;
         },
       })}
     >

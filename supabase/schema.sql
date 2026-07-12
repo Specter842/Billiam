@@ -42,8 +42,25 @@ CREATE TABLE IF NOT EXISTS events (
   lat             double precision,
   lng             double precision,
   capacity        integer NOT NULL,
-  seats_remaining integer NOT NULL
+  seats_remaining integer NOT NULL,
+  -- Tags an event for grouping outside the main list, e.g. 'workshop' —
+  -- individual workshops (singing, acting, ML, ...) get their own row so
+  -- each has its own seats/registration, but are listed together on a
+  -- dedicated Workshops page instead of cluttering the main Events list.
+  category        text
 );
+
+-- Add the column for anyone re-running this against a database created
+-- before `category` existed (CREATE TABLE IF NOT EXISTS above is a no-op
+-- on an existing table, so it wouldn't otherwise pick up new columns).
+ALTER TABLE events ADD COLUMN IF NOT EXISTS category text;
+
+-- FIX: re-running the old seed INSERT (see git history) silently
+-- triplicated every event, because there was nothing for its
+-- `ON CONFLICT DO NOTHING` to actually conflict on. This is what makes
+-- that clause mean something, and stops any future re-seed from
+-- duplicating rows the same way.
+CREATE UNIQUE INDEX IF NOT EXISTS events_name_start_time_key ON events (name, start_time);
 
 ALTER TABLE events ENABLE ROW LEVEL SECURITY;
 
@@ -256,64 +273,11 @@ CREATE TRIGGER on_auth_user_created
   FOR EACH ROW EXECUTE FUNCTION handle_new_user();
 
 -- ── 6. SEED DATA ─────────────────────────────────────────────
--- FIX: "Closing Ceremony" previously had seats_remaining = 3 against
--- capacity = 300, inconsistent with every other row (capacity ==
--- seats_remaining). Corrected to 300 below. Change it back deliberately
--- if you actually wanted a near-sold-out demo row.
-INSERT INTO events (name, description, start_time, end_time, location_name, lat, lng, capacity, seats_remaining)
-VALUES
-  (
-    'Opening Keynote',
-    'Join us for the opening keynote where we unveil the vision for the year ahead. Featuring live demonstrations, special guests, and a Q&A session.',
-    '2026-09-15 09:00:00+05:30',
-    '2026-09-15 11:00:00+05:30',
-    'Grand Ballroom, The Leela Palace',
-    12.9716, 77.5946,
-    300, 300
-  ),
-  (
-    'Design Systems Workshop',
-    'A hands-on workshop covering design tokens, component libraries, and the principles behind building scalable design systems.',
-    '2026-09-15 13:00:00+05:30',
-    '2026-09-15 16:00:00+05:30',
-    'Workshop Hall A, The Leela Palace',
-    12.9720, 77.5950,
-    60, 60
-  ),
-  (
-    'Engineering Deep Dive',
-    'Technical deep dive into distributed systems, database internals, and performance optimization strategies.',
-    '2026-09-16 10:00:00+05:30',
-    '2026-09-16 12:30:00+05:30',
-    'Conference Room B, The Leela Palace',
-    12.9718, 77.5948,
-    80, 80
-  ),
-  (
-    'Networking Dinner',
-    'An evening of conversation and connection. Meet speakers, sponsors, and fellow attendees over a curated three-course dinner.',
-    '2026-09-15 19:00:00+05:30',
-    '2026-09-15 22:00:00+05:30',
-    'Rooftop Terrace, The Leela Palace',
-    12.9722, 77.5952,
-    150, 150
-  ),
-  (
-    'Product Strategy Panel',
-    'Five product leaders discuss how they prioritize roadmaps, handle competing stakeholders, and ship with confidence.',
-    '2026-09-16 14:00:00+05:30',
-    '2026-09-16 15:30:00+05:30',
-    'Auditorium, The Leela Palace',
-    12.9714, 77.5944,
-    200, 200
-  ),
-  (
-    'Closing Ceremony',
-    'Wrap up two days of learning with award announcements, community highlights, and a look at what comes next.',
-    '2026-09-16 17:00:00+05:30',
-    '2026-09-16 18:30:00+05:30',
-    'Grand Ballroom, The Leela Palace',
-    12.9716, 77.5946,
-    300, 300
-  )
-ON CONFLICT DO NOTHING;
+-- The placeholder conference demo events that used to be seeded here
+-- (Opening Keynote, Design Systems Workshop, etc.) have been removed —
+-- they were never real FROSH content, and re-running this INSERT with no
+-- unique constraint to conflict on is exactly what triplicated them in
+-- production. The real event roster is managed through the in-app Admin
+-- tab (Events > Admin, restricted to the admin email above) instead of a
+-- static seed block, since it now has full add/delete support and the
+-- unique index above makes it safe either way.
