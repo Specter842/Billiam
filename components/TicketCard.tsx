@@ -9,13 +9,14 @@ import Animated, {
 } from 'react-native-reanimated';
 import QRCode from 'react-native-qrcode-svg';
 import { useThemeColors, Fonts, TypeScale, Spacing, Radius, Shadows, ThemeColors } from '@/theme/constants';
+import { formatEventTimeRange } from '@/lib/format';
 import StatusChip from './StatusChip';
 
 type Props = {
   eventName: string;
   locationName: string | null;
-  startTime: string;
-  endTime: string;
+  startTime: string | null;
+  endTime: string | null;
   status: 'confirmed' | 'waitlisted';
   registrationId: string;
 };
@@ -44,16 +45,15 @@ export default function TicketCard({ eventName, locationName, startTime, endTime
   const [flipped, setFlipped] = useState(false);
   const rotation = useSharedValue(0);
 
-  const start = new Date(startTime);
-  const end = new Date(endTime);
-
-  const dateStr = start.toLocaleDateString('en-IN', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
-  const timeStr = `${formatTime(start)} – ${formatTime(end)}`;
+  const dateStr = startTime
+    ? new Date(startTime).toLocaleDateString('en-IN', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      })
+    : 'Date TBD';
+  const timeStr = formatEventTimeRange(startTime, endTime);
   const shortCode = registrationId.split('-')[0].toUpperCase();
 
   function handleFlip() {
@@ -116,10 +116,6 @@ export default function TicketCard({ eventName, locationName, startTime, endTime
       </Animated.View>
     </Pressable>
   );
-}
-
-function formatTime(d: Date) {
-  return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
 }
 
 const getStyles = (Colors: ThemeColors) => StyleSheet.create({

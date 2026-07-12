@@ -1,6 +1,7 @@
 import { useThemeColors, Fonts, TypeScale, Spacing, Radius, Shadows, ThemeColors } from '@/theme/constants';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Event } from '@/lib/supabase';
+import { formatEventDateShort, formatEventTime } from '@/lib/format';
 import CapacityIndicator from './CapacityIndicator';
 
 type Props = {
@@ -15,17 +16,10 @@ type Props = {
 export default function EventCard({ event, onPress }: Props) {
   const Colors = useThemeColors();
   const styles = getStyles(Colors);
-  const start = new Date(event.start_time);
-  const dateStr = start.toLocaleDateString('en-IN', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-  });
-  const timeStr = start.toLocaleTimeString('en-IN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
-  });
+  const start = event.start_time ? new Date(event.start_time) : null;
+  const timeStr = start
+    ? `${formatEventDateShort(event.start_time)}  ·  ${formatEventTime(event.start_time)}`
+    : 'Date & time TBD';
 
   return (
     <Pressable
@@ -36,12 +30,18 @@ export default function EventCard({ event, onPress }: Props) {
     >
       {/* Date / time badge */}
       <View style={styles.dateBadge}>
-        <Text style={styles.dateDay}>
-          {start.toLocaleDateString('en-IN', { day: 'numeric' })}
-        </Text>
-        <Text style={styles.dateMonth}>
-          {start.toLocaleDateString('en-IN', { month: 'short' }).toUpperCase()}
-        </Text>
+        {start ? (
+          <>
+            <Text style={styles.dateDay}>
+              {start.toLocaleDateString('en-IN', { day: 'numeric' })}
+            </Text>
+            <Text style={styles.dateMonth}>
+              {start.toLocaleDateString('en-IN', { month: 'short' }).toUpperCase()}
+            </Text>
+          </>
+        ) : (
+          <Text style={styles.dateTbd}>TBD</Text>
+        )}
       </View>
 
       {/* Main info */}
@@ -54,11 +54,12 @@ export default function EventCard({ event, onPress }: Props) {
             {event.location_name}
           </Text>
         ) : null}
-        <Text style={styles.time}>{`${dateStr}  ·  ${timeStr}`}</Text>
+        <Text style={styles.time}>{timeStr}</Text>
         <View style={styles.capacityRow}>
           <CapacityIndicator
             seatsRemaining={event.seats_remaining}
             capacity={event.capacity}
+            requiresTicket={event.requires_ticket}
           />
         </View>
       </View>
@@ -100,6 +101,12 @@ const getStyles = (Colors: ThemeColors) => StyleSheet.create({
     lineHeight: 14,
     color: Colors.muted,
     letterSpacing: 1,
+  },
+  dateTbd: {
+    fontFamily: Fonts.mono,
+    fontSize: 11,
+    color: Colors.muted,
+    letterSpacing: 0.5,
   },
   info: {
     flex: 1,

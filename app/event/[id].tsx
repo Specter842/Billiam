@@ -13,6 +13,7 @@ import { supabase, Event, RegisterResult } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 import CapacityIndicator from '@/components/CapacityIndicator';
 import TicketCard from '@/components/TicketCard';
+import { formatEventDate, formatEventTimeRange } from '@/lib/format';
 import { useThemeColors, Fonts, TypeScale, Spacing, Radius, Shadows, ThemeColors } from '@/theme/constants';
 
 type RegistrationState =
@@ -136,23 +137,6 @@ export default function EventDetailScreen() {
     );
   }
 
-  // ── Format helpers ──
-  function formatDate(iso: string) {
-    return new Date(iso).toLocaleDateString('en-IN', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-    });
-  }
-  function formatTime(iso: string) {
-    return new Date(iso).toLocaleTimeString('en-IN', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-    });
-  }
-
   // ── Loading ──
   if (loading) {
     return (
@@ -185,12 +169,8 @@ export default function EventDetailScreen() {
 
       {/* ── Meta row ── */}
       <View style={styles.metaBlock}>
-        <MetaRow icon="📅" label={formatDate(event.start_time)} />
-        <MetaRow
-          icon="🕐"
-          label={`${formatTime(event.start_time)} – ${formatTime(event.end_time)}`}
-          mono
-        />
+        <MetaRow icon="📅" label={formatEventDate(event.start_time)} />
+        <MetaRow icon="🕐" label={formatEventTimeRange(event.start_time, event.end_time)} mono />
         {event.location_name && (
           <MetaRow icon="📍" label={event.location_name} />
         )}
@@ -201,6 +181,7 @@ export default function EventDetailScreen() {
         <CapacityIndicator
           seatsRemaining={event.seats_remaining}
           capacity={event.capacity}
+          requiresTicket={event.requires_ticket}
         />
       </View>
 
@@ -213,7 +194,11 @@ export default function EventDetailScreen() {
       <View style={styles.divider} />
 
       {/* ── Ticket card (post-registration) ── */}
-      {showTicket && ticketResult ? (
+      {!event.requires_ticket ? (
+        <View style={styles.noTicketNote}>
+          <Text style={styles.noTicketText}>No ticket required — just show up!</Text>
+        </View>
+      ) : showTicket && ticketResult ? (
         <View>
           <Text style={styles.sectionLabel}>Your registration</Text>
           <Text style={styles.ticketHint}>Tap the ticket to flip it and reveal your check-in QR code</Text>
@@ -373,6 +358,17 @@ const getStyles = (Colors: ThemeColors) => StyleSheet.create({
     color: Colors.muted,
     textAlign: 'center',
     marginTop: Spacing.sm,
+  },
+  noTicketNote: {
+    backgroundColor: Colors.royalTint,
+    borderRadius: Radius,
+    padding: Spacing.base,
+    alignItems: 'center',
+  },
+  noTicketText: {
+    fontFamily: Fonts.bodySemiBold,
+    ...TypeScale.body,
+    color: Colors.royal,
   },
   registerButton: {
     backgroundColor: Colors.royal,

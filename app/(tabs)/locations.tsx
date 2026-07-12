@@ -82,7 +82,13 @@ export default function LocationsScreen() {
               <View style={styles.eventInfo}>
                 <Text style={styles.eventName} numberOfLines={1}>{event.name}</Text>
                 <Text style={styles.eventSeats}>
-                  {event.seats_remaining === 0 ? 'Sold out' : `${event.seats_remaining} seats left`}
+                  {!event.requires_ticket
+                    ? 'No ticket required'
+                    : event.seats_remaining === null
+                    ? 'Capacity TBD'
+                    : event.seats_remaining === 0
+                    ? 'Sold out'
+                    : `${event.seats_remaining} seats left`}
                 </Text>
               </View>
               <Text style={styles.chevron}>›</Text>

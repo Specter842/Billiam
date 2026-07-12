@@ -12,6 +12,7 @@ import {
 import { supabase, Event } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 import { ADMIN_EMAIL } from '@/lib/admin';
+import { formatEventDateShort, formatEventTime } from '@/lib/format';
 import { useThemeColors, Fonts, TypeScale, Spacing, Radius, ThemeColors } from '@/theme/constants';
 
 export default function AdminScreen() {
@@ -33,6 +34,8 @@ export default function AdminScreen() {
   const [lat, setLat] = useState('');
   const [lng, setLng] = useState('');
   const [capacity, setCapacity] = useState('');
+  const [category, setCategory] = useState('');
+  const [requiresTicket, setRequiresTicket] = useState(true);
 
   const fetchEvents = useCallback(async () => {
     const { data } = await supabase.from('events').select('*').order('start_time', { ascending: true });
@@ -57,20 +60,34 @@ export default function AdminScreen() {
   }
 
   async function handleCreate() {
-    if (!name.trim() || !startTime.trim() || !endTime.trim() || !capacity.trim()) {
-      setError('Name, start time, end time, and capacity are required.');
+    // Only the name is truly required — everything else can go in blank
+    // and be filled in later. Whatever's given still has to be valid,
+    // though: a garbled date or a negative capacity is worse than none.
+    if (!name.trim()) {
+      setError('Name is required.');
       return;
     }
-    const cap = parseInt(capacity, 10);
-    if (!Number.isFinite(cap) || cap <= 0) {
-      setError('Capacity must be a positive number.');
-      return;
+
+    let cap: number | null = null;
+    if (capacity.trim()) {
+      cap = parseInt(capacity, 10);
+      if (!Number.isFinite(cap) || cap <= 0) {
+        setError('Capacity must be a positive number, or left blank.');
+        return;
+      }
     }
-    const start = new Date(startTime);
-    const end = new Date(endTime);
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-      setError('Start and end time must be valid dates, e.g. 2026-09-15 09:00');
-      return;
+
+    let startIso: string | null = null;
+    let endIso: string | null = null;
+    if (startTime.trim() || endTime.trim()) {
+      const start = startTime.trim() ? new Date(startTime) : null;
+      const end = endTime.trim() ? new Date(endTime) : null;
+      if ((start && isNaN(start.getTime())) || (end && isNaN(end.getTime()))) {
+        setError('Start and end time must be valid dates, e.g. 2026-09-15 09:00, or both left blank.');
+        return;
+      }
+      startIso = start ? start.toISOString() : null;
+      endIso = end ? end.toISOString() : null;
     }
 
     setCreating(true);
@@ -78,13 +95,15 @@ export default function AdminScreen() {
     const { error: insertError } = await supabase.from('events').insert({
       name: name.trim(),
       description: description.trim() || null,
-      start_time: start.toISOString(),
-      end_time: end.toISOString(),
+      start_time: startIso,
+      end_time: endIso,
       location_name: locationName.trim() || null,
       lat: lat.trim() ? parseFloat(lat) : null,
       lng: lng.trim() ? parseFloat(lng) : null,
       capacity: cap,
       seats_remaining: cap,
+      category: category.trim() || null,
+      requires_ticket: requiresTicket,
     });
     setCreating(false);
 
@@ -101,6 +120,8 @@ export default function AdminScreen() {
     setLat('');
     setLng('');
     setCapacity('');
+    setCategory('');
+    setRequiresTicket(true);
     fetchEvents();
   }
 
@@ -161,7 +182,7 @@ export default function AdminScreen() {
             style={styles.input}
             value={startTime}
             onChangeText={setStartTime}
-            placeholder="2026-09-15 09:00"
+            placeholder="Blank = TBD"
             placeholderTextColor={Colors.muted}
           />
         </View>
@@ -171,11 +192,12 @@ export default function AdminScreen() {
             style={styles.input}
             value={endTime}
             onChangeText={setEndTime}
-            placeholder="2026-09-15 11:00"
+            placeholder="Blank = TBD"
             placeholderTextColor={Colors.muted}
           />
         </View>
       </View>
+      <Text style={styles.hint}>Format: 2026-09-15 09:00 — leave both blank for "Date & time TBD".</Text>
 
       <View style={styles.field}>
         <Text style={styles.label}>Location</Text>
@@ -219,11 +241,33 @@ export default function AdminScreen() {
           style={styles.input}
           value={capacity}
           onChangeText={setCapacity}
-          placeholder="100"
+          placeholder="Blank = no seat limit tracked"
           placeholderTextColor={Colors.muted}
           keyboardType="numeric"
         />
       </View>
+
+      <View style={styles.field}>
+        <Text style={styles.label}>Category</Text>
+        <TextInput
+          style={styles.input}
+          value={category}
+          onChangeText={setCategory}
+          placeholder="workshop, or leave blank for a regular event"
+          placeholderTextColor={Colors.muted}
+        />
+      </View>
+
+      <Pressable
+        id="admin-requires-ticket-toggle"
+        style={styles.toggleRow}
+        onPress={() => setRequiresTicket((v) => !v)}
+      >
+        <View style={[styles.checkbox, requiresTicket && styles.checkboxChecked]}>
+          {requiresTicket ? <Text style={styles.checkboxMark}>✓</Text> : null}
+        </View>
+        <Text style={styles.toggleLabel}>Requires a ticket (uncheck for e.g. a treasure hunt — no register/QR flow)</Text>
+      </Pressable>
 
       <Pressable
         id="admin-create-button"
@@ -249,14 +293,16 @@ export default function AdminScreen() {
                 {event.name}
               </Text>
               <Text style={styles.eventMeta}>
-                {new Date(event.start_time).toLocaleString('en-IN', {
-                  day: 'numeric',
-                  month: 'short',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
+                {event.start_time
+                  ? `${formatEventDateShort(event.start_time)} · ${formatEventTime(event.start_time)}`
+                  : 'Date TBD'}
                 {' · '}
-                {event.seats_remaining}/{event.capacity} seats
+                {!event.requires_ticket
+                  ? 'no ticket'
+                  : event.capacity === null
+                  ? 'capacity TBD'
+                  : `${event.seats_remaining}/${event.capacity} seats`}
+                {event.category ? ` · ${event.category}` : ''}
               </Text>
             </View>
             <Pressable
@@ -313,6 +359,41 @@ const getStyles = (Colors: ThemeColors) => StyleSheet.create({
   field: { gap: Spacing.xs },
   row: { flexDirection: 'row', gap: Spacing.base },
   flexHalf: { flex: 1 },
+  hint: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    color: Colors.muted,
+    marginTop: -Spacing.xs,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: Colors.line,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: Colors.royal,
+    borderColor: Colors.royal,
+  },
+  checkboxMark: {
+    color: Colors.paper,
+    fontSize: 14,
+    fontFamily: Fonts.bodySemiBold,
+  },
+  toggleLabel: {
+    fontFamily: Fonts.body,
+    ...TypeScale.caption,
+    color: Colors.ink,
+    flex: 1,
+  },
   label: {
     fontFamily: Fonts.bodySemiBold,
     ...TypeScale.caption,

@@ -36,31 +36,47 @@ CREATE TABLE IF NOT EXISTS events (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name            text NOT NULL,
   description     text,
-  start_time      timestamptz NOT NULL,
-  end_time        timestamptz NOT NULL,
+  -- Nullable: many events go live before their schedule/capacity is
+  -- finalized. The app shows "TBD" wherever these are null instead of
+  -- blocking event creation on having every field up front.
+  start_time      timestamptz,
+  end_time        timestamptz,
   location_name   text,
   lat             double precision,
   lng             double precision,
-  capacity        integer NOT NULL,
-  seats_remaining integer NOT NULL,
+  capacity        integer,
+  seats_remaining integer,
   -- Tags an event for grouping outside the main list, e.g. 'workshop' —
   -- individual workshops (singing, acting, ML, ...) get their own row so
   -- each has its own seats/registration, but are listed together on a
   -- dedicated Workshops page instead of cluttering the main Events list.
-  category        text
+  category        text,
+  -- Some events (e.g. a campus-wide treasure hunt) don't use the
+  -- register/ticket/QR flow at all — just show up. Defaults true since
+  -- that's every event so far except ones explicitly marked otherwise.
+  requires_ticket boolean NOT NULL DEFAULT true
 );
 
--- Add the column for anyone re-running this against a database created
--- before `category` existed (CREATE TABLE IF NOT EXISTS above is a no-op
--- on an existing table, so it wouldn't otherwise pick up new columns).
+-- For anyone re-running this against a database created before these
+-- existed (CREATE TABLE IF NOT EXISTS above is a no-op on an existing
+-- table, so it wouldn't otherwise pick up new/changed columns).
 ALTER TABLE events ADD COLUMN IF NOT EXISTS category text;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS requires_ticket boolean NOT NULL DEFAULT true;
+ALTER TABLE events ALTER COLUMN start_time DROP NOT NULL;
+ALTER TABLE events ALTER COLUMN end_time DROP NOT NULL;
+ALTER TABLE events ALTER COLUMN capacity DROP NOT NULL;
+ALTER TABLE events ALTER COLUMN seats_remaining DROP NOT NULL;
 
 -- FIX: re-running the old seed INSERT (see git history) silently
 -- triplicated every event, because there was nothing for its
 -- `ON CONFLICT DO NOTHING` to actually conflict on. This is what makes
 -- that clause mean something, and stops any future re-seed from
--- duplicating rows the same way.
-CREATE UNIQUE INDEX IF NOT EXISTS events_name_start_time_key ON events (name, start_time);
+-- duplicating rows the same way. NULLS NOT DISTINCT matters here: by
+-- default Postgres treats every NULL as unique for uniqueness purposes,
+-- which would let events with an unset start_time duplicate freely —
+-- exactly the ones most likely to get re-seeded before a date is set.
+DROP INDEX IF EXISTS events_name_start_time_key;
+CREATE UNIQUE INDEX events_name_start_time_key ON events (name, start_time) NULLS NOT DISTINCT;
 
 ALTER TABLE events ENABLE ROW LEVEL SECURITY;
 
@@ -142,6 +158,10 @@ CREATE POLICY "Users can cancel own registrations"
 -- NON-NEGOTIABLE: one atomic UPDATE ... RETURNING inside a transaction.
 -- If seats_remaining > 0  → confirmed + decrement
 -- If seats_remaining = 0  → waitlisted (no decrement)
+-- If capacity was never set (NULL) → confirmed, no seat tracking at all —
+--   distinct from "sold out": `seats_remaining > 0` is NULL (not false)
+--   when seats_remaining is NULL, so the UPDATE below would silently
+--   match zero rows for these events too unless handled explicitly here.
 -- Duplicate registrations (UNIQUE conflict) return existing row data.
 CREATE OR REPLACE FUNCTION register_for_event(p_event_id uuid, p_user_id uuid)
 RETURNS jsonb
@@ -149,22 +169,26 @@ LANGUAGE plpgsql
 SECURITY DEFINER SET search_path = public
 AS $$
 DECLARE
-  v_seats  integer;
-  v_status registration_status;
-  v_reg_id uuid;
+  v_seats     integer;
+  v_has_cap   boolean;
+  v_status    registration_status;
+  v_reg_id    uuid;
 BEGIN
-  -- Single atomic statement: decrement only if seats remain
-  UPDATE events
-     SET seats_remaining = seats_remaining - 1
-   WHERE id = p_event_id
-     AND seats_remaining > 0
-  RETURNING seats_remaining INTO v_seats;
+  SELECT capacity IS NOT NULL INTO v_has_cap FROM events WHERE id = p_event_id;
 
-  -- v_seats is NULL ↔ no row updated ↔ sold out → waitlist
-  IF v_seats IS NOT NULL THEN
-    v_status := 'confirmed';
+  IF v_has_cap THEN
+    -- Single atomic statement: decrement only if seats remain
+    UPDATE events
+       SET seats_remaining = seats_remaining - 1
+     WHERE id = p_event_id
+       AND seats_remaining > 0
+    RETURNING seats_remaining INTO v_seats;
+
+    -- v_seats is NULL ↔ no row updated ↔ sold out → waitlist
+    v_status := CASE WHEN v_seats IS NOT NULL THEN 'confirmed' ELSE 'waitlisted' END;
   ELSE
-    v_status := 'waitlisted';
+    v_status := 'confirmed';
+    v_seats := NULL;
   END IF;
 
   INSERT INTO registrations (user_id, event_id, status)
@@ -176,7 +200,10 @@ BEGIN
   RETURN jsonb_build_object(
     'registration_id', v_reg_id,
     'status',          v_status,
-    'seats_remaining', COALESCE(v_seats, 0)
+    -- NULL here means "no capacity tracked", not "sold out" — the client
+    -- re-fetches the event row for the authoritative seats_remaining
+    -- rather than trusting this value for display.
+    'seats_remaining', v_seats
   );
 END;
 $$;

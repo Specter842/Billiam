@@ -40,3 +40,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# scratch scripts (one-off admin/data scripts, never meant to be committed)
+_tmp_*

@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { supabase, Event } from '@/lib/supabase';
+import { formatEventTime } from '@/lib/format';
 import { useThemeColors, Fonts, TypeScale, Spacing, Radius, ThemeColors } from '@/theme/constants';
 
 type DayGroup = {
@@ -24,8 +25,14 @@ function dateKeyOf(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function groupByDay(events: Event[]): DayGroup[] {
-  const map = new Map<string, Event[]>();
+type ScheduledEvent = Event & { start_time: string };
+
+function groupByDay(allEvents: Event[]): DayGroup[] {
+  // Events without a set time can't belong to a day — they still show on
+  // the main Events tab, just not here.
+  const events = allEvents.filter((e): e is ScheduledEvent => e.start_time !== null);
+
+  const map = new Map<string, ScheduledEvent[]>();
   for (const ev of events) {
     const key = dateKeyOf(new Date(ev.start_time));
     if (!map.has(key)) map.set(key, []);
@@ -90,7 +97,9 @@ export default function CalendarScreen() {
       <View style={styles.empty}>
         <Text style={styles.emptyTitle}>Schedule is empty</Text>
         <Text style={styles.emptyBody}>
-          No events have been scheduled yet. Check back soon.
+          {events.length > 0
+            ? "Events exist but don't have times set yet — check the Events tab."
+            : 'No events have been scheduled yet. Check back soon.'}
         </Text>
       </View>
     );
@@ -139,8 +148,6 @@ export default function CalendarScreen() {
 
         <View style={styles.eventList}>
           {selectedGroup.events.map((ev, idx) => {
-            const startTime = new Date(ev.start_time);
-            const endTime = new Date(ev.end_time);
             const isLast = idx === selectedGroup.events.length - 1;
 
             return (
@@ -151,8 +158,8 @@ export default function CalendarScreen() {
                 onPress={() => router.push(`/event/${ev.id}`)}
               >
                 <View style={styles.timeCol}>
-                  <Text style={styles.timeStart}>{formatTime(startTime)}</Text>
-                  <Text style={styles.timeEnd}>{formatTime(endTime)}</Text>
+                  <Text style={styles.timeStart}>{formatEventTime(ev.start_time) || 'TBD'}</Text>
+                  <Text style={styles.timeEnd}>{formatEventTime(ev.end_time)}</Text>
                 </View>
 
                 <View style={styles.track}>
@@ -170,7 +177,13 @@ export default function CalendarScreen() {
                     </Text>
                   ) : null}
                   <Text style={styles.seatsText}>
-                    {ev.seats_remaining === 0 ? 'Sold out — waitlist open' : `${ev.seats_remaining} seats left`}
+                    {!ev.requires_ticket
+                      ? 'No ticket required'
+                      : ev.seats_remaining === null
+                      ? 'Capacity TBD'
+                      : ev.seats_remaining === 0
+                      ? 'Sold out — waitlist open'
+                      : `${ev.seats_remaining} seats left`}
                   </Text>
                 </View>
               </Pressable>
@@ -180,10 +193,6 @@ export default function CalendarScreen() {
       </ScrollView>
     </View>
   );
-}
-
-function formatTime(d: Date) {
-  return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
 }
 
 const getStyles = (Colors: ThemeColors) => StyleSheet.create({

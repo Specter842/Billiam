@@ -45,14 +45,17 @@ export type Event = {
   id: string;
   name: string;
   description: string | null;
-  start_time: string;
-  end_time: string;
+  // Nullable: an event can go live before its schedule/capacity is
+  // finalized — the UI shows "TBD" wherever these are null.
+  start_time: string | null;
+  end_time: string | null;
   location_name: string | null;
   lat: number | null;
   lng: number | null;
-  capacity: number;
-  seats_remaining: number;
+  capacity: number | null;
+  seats_remaining: number | null;
   category: string | null;
+  requires_ticket: boolean;
 };
 
 export type RegistrationStatus = 'confirmed' | 'waitlisted' | 'cancelled';
