@@ -4,25 +4,13 @@ import { useAuth } from '@/lib/auth';
 import { ADMIN_EMAIL } from '@/lib/admin';
 import { Platform, Text } from 'react-native';
 
-function TabIcon({ label, focused }: { label: string; focused: boolean }) {
-  // Using emoji icons — no icon library required
-  const icons: Record<string, string> = {
-    Events:         focused ? '◉' : '○',
-    Map:            focused ? '◈' : '◇',
-    Schedule:       focused ? '▣' : '□',
-    Accommodation:  focused ? '⬛' : '⬜',
-    Contact:        focused ? '◆' : '◇',
-  };
-  return null; // icon handled by tabBarIcon option below
-}
-
 const ICONS: Record<string, { active: string; inactive: string }> = {
-  index:         { active: '◉', inactive: '○' },
-  map:           { active: '◈', inactive: '◇' },
-  calendar:      { active: '▣', inactive: '□' },
-  accommodation: { active: '⬛', inactive: '⬜' },
-  contact:       { active: '◆', inactive: '◇' },
-  admin:         { active: '⚙', inactive: '⚙' },
+  index:     { active: '◉', inactive: '○' },
+  locations: { active: '◈', inactive: '◇' },
+  calendar:  { active: '▣', inactive: '□' },
+  hostels:   { active: '⬛', inactive: '⬜' },
+  contact:   { active: '◆', inactive: '◇' },
+  admin:     { active: '⚙', inactive: '⚙' },
 };
 
 export default function TabsLayout() {
@@ -75,16 +63,16 @@ export default function TabsLayout() {
         options={{ title: 'Events', tabBarLabel: 'Events' }}
       />
       <Tabs.Screen
-        name="map"
-        options={{ title: 'Map', tabBarLabel: 'Map' }}
+        name="locations"
+        options={{ title: 'Locations', tabBarLabel: 'Locations' }}
       />
       <Tabs.Screen
         name="calendar"
         options={{ title: 'Schedule', tabBarLabel: 'Schedule' }}
       />
       <Tabs.Screen
-        name="accommodation"
-        options={{ title: 'Stay', tabBarLabel: 'Stay' }}
+        name="hostels"
+        options={{ title: 'Hostels', tabBarLabel: 'Hostels' }}
       />
       <Tabs.Screen
         name="contact"

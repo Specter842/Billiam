@@ -9,10 +9,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.events.app",
-      "config": {
-        "googleMapsApiKey": ""
-      }
+      "bundleIdentifier": "com.events.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -22,12 +19,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.events.app",
-      "config": {
-        "googleMaps": {
-          "apiKey": ""
-        }
-      }
+      "package": "com.events.app"
     },
     "web": {
       "bundler": "metro",
